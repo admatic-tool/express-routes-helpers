@@ -2,12 +2,13 @@
 
 const _ = require("underscore")
 const decamelize = require("decamelize")
+const camelcase = require("camelcase")
+const upperCamelCase = require("uppercamelcase")
 
 let startMiddlewaresFor = rInfo => {
   if (rInfo.startMid)
     return _(rInfo.startMid).map(middfName => require(`../../middlewares/${middfName}`))
 }
-
 
 /**
  * build url helpers and insert in express app
@@ -22,17 +23,34 @@ let buildUrlHelpers = (app, config) => {
   let urlHelpers = app.get("urlhelpers")
 
   routes.forEach(rInfo => {
-    /* build helper method names */
-    let actionName = rInfo.action.charAt(0).toUpperCase() + rInfo.action.slice(1)
-    let methodName = `${rInfo.controller.replace("Controller", "")}${actionName}Url`
 
-    /*build methods */
-    urlHelpers[methodName] = params => {
-      let path = rInfo.path
-      params.forEach((v, k) => {
-        path = path.replace(`:${k}`, v)
-      })
-      return `${host}${path}`
+    let methodName
+    /* build helper method names */
+    /* custom method Name */
+    if(rInfo.as){
+      methodName =  `${rInfo.as}Url`
+    /* to: "controller#action" syntax*/
+    }else if(rInfo.to){
+      let pathSplited = rInfo.to.split("#")
+      methodName = camelcase(`${pathSplited[0]}_${pathSplited[1]}_Url`)
+    /* by all parameters */
+    } else {
+      let ctrlName = rInfo.controller.replace("Controller", "")
+      methodName = camelcase(`${ctrlName}_${rInfo.action}_Url`)
+    }
+
+    /* build methods */
+    if(!urlHelpers[methodName]){
+      urlHelpers[methodName] = params => {
+        params = params ? params : {}
+        let path = rInfo.path || rInfo.from.split(" ")[1]
+        _.each(params, (v, k) => {
+          console.log(k,v)
+          debugger
+          path = path.replace(`:${k}`, v)
+        })
+        return `${host}${path}`
+      }
     }
   })
 
@@ -58,17 +76,28 @@ let buildRoutes = (app, config) => {
      * http verb, corresponding to express route methods,
      * becouse this. "ALL" must works too like Route#all
      */
-    let httpVerb = rInfo.method.toLowerCase()
+    let httpVerb =  rInfo.from ? rInfo.from.split(" ")[0] : rInfo.method
+    httpVerb = httpVerb.toLowerCase()
+
+    /*
+    * path to resource
+    */
+    let path = rInfo.from ? rInfo.from.split(" ")[1] : rInfo.path
 
     /*
      * object#method to handle this endpoint
      * lets assume that you need have a controllers folder
      */
+    let handler
+    if(rInfo.to){
+      let ctrlFileName = `${rInfo.to.split("#")[0]}-controller`
+      let actionName = rInfo.to.split("#")[1]
+      handler = require(`${controllersPath}/${ctrlFileName}`)[actionName]
+    }else
+      handler = require(`${controllersPath}/${decamelize(rInfo.controller, "-")}`)[rInfo.action]
 
-    let handler = require(`${controllersPath}/${decamelize(rInfo.controller, "-")}`)[rInfo.action]
     let endPoint = _.compact([ startMiddlewaresFor(rInfo), handler ])
-
-    app[httpVerb](rInfo.path, endPoint)
+    app[httpVerb](path, endPoint)
   })
 
   /* apply default end middlewares */
@@ -105,3 +134,4 @@ module.exports = ExpressRoutesHelper
  * expressRoutesHelper.build(config)
  *
  */
+
