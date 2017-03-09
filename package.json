@@ -14,6 +14,7 @@
   ],
   "dependencies": {
     "camelcase": "^3.0.0",
+    "co-express": "^2.0.0",
     "decamelize": "^1.2.0",
     "underscore": "*",
     "uppercamelcase": "^1.1.0"

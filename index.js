@@ -4,6 +4,7 @@ const _ = require("underscore")
 const decamelize = require("decamelize")
 const camelcase = require("camelcase")
 const upperCamelCase = require("uppercamelcase")
+const wrap = require("co-express")
 
 let startMiddlewaresFor = rInfo => {
   if (rInfo.startMid)
@@ -46,7 +47,6 @@ let buildUrlHelpers = (app, config) => {
         let path = rInfo.path || rInfo.from.split(" ")[1]
         _.each(params, (v, k) => {
           console.log(k,v)
-          debugger
           path = path.replace(`:${k}`, v)
         })
         return `${host}${path}`
@@ -95,6 +95,10 @@ let buildRoutes = (app, config) => {
       handler = require(`${controllersPath}/${ctrlFileName}`)[actionName]
     }else
       handler = require(`${controllersPath}/${decamelize(rInfo.controller, "-")}`)[rInfo.action]
+
+    /* check whether it is a generator */
+    if (/^(function)?\*/.test(handler.toString()))
+      handler = wrap(handler)
 
     let endPoint = _.compact([ startMiddlewaresFor(rInfo), handler ])
     app[httpVerb](path, endPoint)
